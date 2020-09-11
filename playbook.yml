@@ -15,7 +15,8 @@
     # php_upload_max_filesize: "256M"
     # php_post_max_size: "256M"
     # php_output_buffering: "Off"
-    # php_max_execution_time: "300"
+    php_max_execution_time: "180"
+    php_max_input_time: "180"
     # php_date_timezone: "UTC"
 
     espocrm_version: 5.9.3
@@ -29,7 +30,7 @@
 
     - name: Fetch EspoCRM Role
       git:
-        repo: https://ro:6aVq2gmsgyshxDUzs7D-@pwslab.org/ansible/espocrm-playbook.git
+        repo: https://ro:esGqMtfHN7qqM_MUsRQP@pwslab.org/ansible/espocrm-playbook.git
         dest: /root/.ansible/roles/pwslab.espocrm
         version: master
         force: yes
@@ -119,7 +120,9 @@
     - name: Installing MYSQL
       include_role:
           name: pwslab.mysql
-      when: not mysql_exists.stat.exists
+      when: 
+        - not mysql_exists.stat.exists
+        - not os_check.stdout | regex_search("CentOS Linux 7")
 
     - name: Installing Remi
       include_role:
