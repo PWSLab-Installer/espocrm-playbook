@@ -1,0 +1,186 @@
+---
+
+    # -   name: Create schema for espocrm
+    #     shell: mysql -u root -p'root' -e "CREATE SCHEMA espocrm DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;"
+
+    -   name: Create DB User espocrm
+        shell: mysql -u root -p'root' -e "CREATE USER 'espocrm'@'localhost' IDENTIFIED BY 'espocrm';"
+
+    -   name: Grant Privs to User espocrm
+        shell: mysql -u root -p'root' -e "GRANT ALL PRIVILEGES ON espocrm.* TO 'espocrm'@'localhost';"
+    
+    -   name: Alter Privs to User espocrm
+        shell: mysql -u root -p'root' -e "ALTER USER espocrm@'localhost' IDENTIFIED WITH mysql_native_password BY 'espocrm';"
+        when:
+            - os_check.stdout | regex_search("Ubuntu 20")
+
+    -   name: Create EspoCRM Directory
+        file:
+            path: /var/www/html/espocrm
+            state: directory
+            # recurse: yes
+            # owner: www-data
+            # mode: '0755'
+
+    -   name: Get EspoCRM
+        get_url: 
+            url: https://www.espocrm.com/downloads/EspoCRM-{{ espocrm_version }}.zip
+            dest: /tmp
+    
+    -   name: Extract EspoCRM into /tmp
+        unarchive:
+            src: /tmp/EspoCRM-{{ espocrm_version }}.zip
+            dest: /tmp
+        when:
+            - os_check.stdout | regex_search("Ubuntu") or os_check.stdout | regex_search("CentOS")
+
+
+    -   name: Enable EspoCRM
+        command: 
+             mv /tmp/EspoCRM-{{ espocrm_version }} /var/www/html/espocrm
+        ignore_errors: yes
+        when:
+            - os_check.stdout | regex_search("Ubuntu") or os_check.stdout | regex_search("CentOS")
+
+    -   name: Grant Permissions
+        file:
+            path: /var/www/html/espocrm
+            recurse: yes
+            owner: www-data
+            mode: '0755'
+        when:
+            - os_check.stdout | regex_search("Ubuntu") 
+
+    -   name: Grant Permissions
+        file:
+            path: /var/www/html/espocrm
+            recurse: yes
+            owner: apache
+            mode: '0755'
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Sets Apache conf file - Ubuntu
+        become: true
+        template:
+            src: "espocrm.conf.j2"
+            dest: "/etc/apache2/sites-available/espocrm.conf"
+        when:
+                - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Disable default config
+        command: a2ensite espocrm.conf
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Disable default config
+        command: a2dissite 000-default.conf
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Install PHP Packages
+        apt: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - php-cli
+            - php-common
+            - php-mbstring
+            - php-gd
+            - php-intl
+            - php-xml
+            - php-mysql
+            - php-zip
+            - php-curl
+            - php-xmlrpc
+            - libapache2-mod-php
+            - php-gd
+            - php-zip
+            - php-curl
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Restart Apache
+        service:
+            name: apache2
+            state: restarted
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Sets Apache conf file - CentOS
+        become: true
+        template:
+            src: "espocrm.conf.j2"
+            dest: "/etc/httpd/conf.d/espocrm.conf"
+        when:
+                - os_check.stdout | regex_search("CentOS")
+
+    -   name: Install PHP Packages
+        yum: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - php-mcrypt
+            - curl
+            - zlib
+            - php-gd
+            - php-mbstring
+            - php-xml
+            - php-mysql
+            - php-zip   
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Enable remi repo - CentOS 7
+        command: yum-config-manager --enable remi-php74
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 7")
+
+    -   name: Install PHP Packages
+        yum: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - curl
+            - zlib
+            - php-gd
+            - php-mbstring
+            - php-xml
+            - php-zip
+            - php-pdo_mysql
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 7")
+
+    -   name: Restart Apache
+        service:
+            name: httpd
+            state: restarted
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Granting Permissions
+        file:
+            path: /var/www/html/espocrm
+            recurse: yes
+            owner: www-data
+            mode: '0777'
+        when:
+            - os_check.stdout | regex_search("Ubuntu") 
+
+    -   name: Granting Permissions
+        file:
+            path: /var/www/html/espocrm
+            recurse: yes
+            owner: apache
+            mode: '0777'
+        when:
+            - os_check.stdout | regex_search("CentOS") 
+
+    -   name: Disable SELinux
+        selinux:
+            state: disabled
+        when:
+            - os_check.stdout | regex_search("CentOS") 
